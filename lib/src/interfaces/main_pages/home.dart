@@ -635,10 +635,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         final generalCampaigns = homeData.endingCampaigns
             .where((campaign) => campaign.category == 'General Campaign')
             .toList();
-        final screenWidth = MediaQuery.sizeOf(context).width;
-        final textScale = MediaQuery.textScalerOf(context).scale(1);
-        final campaignCardHeight = (screenWidth < 380 ? 440.0 : 460.0) +
-            ((textScale - 1).clamp(0.0, double.infinity) * 200);
+        final campaignCardHeight =
+            HomeGradientCampaignCard.responsiveHeight(context);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

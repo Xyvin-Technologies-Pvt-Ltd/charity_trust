@@ -463,6 +463,37 @@ class HomeGradientCampaignCard extends ConsumerWidget {
     this.category,
   });
 
+  /// Carousel height that scales with phone/tablet size and text scale.
+  static double responsiveHeight(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final width = media.size.width;
+    final height = media.size.height;
+    final textScale = media.textScaler.scale(1).clamp(1.0, 1.4);
+
+    // Width-based base (phones → tablets).
+    double base;
+    if (width < 360) {
+      base = 440;
+    } else if (width < 400) {
+      base = 470;
+    } else if (width < 600) {
+      base = 500;
+    } else {
+      base = 540;
+    }
+
+    // Short viewports (SE / compact Android) need a bit more room so the
+    // button isn't fighting dense system UI; tall phones can grow slightly.
+    if (height < 700) {
+      base += 12;
+    } else if (height > 900) {
+      base += 20;
+    }
+
+    base += (textScale - 1.0) * 200;
+    return base.clamp(430.0, 620.0);
+  }
+
   String _displayDueDate() {
     if (dueDate.isEmpty || dueDate == '-') return '';
     return dueDate;
@@ -527,225 +558,307 @@ class HomeGradientCampaignCard extends ConsumerWidget {
     final percent = hasGoal ? (raised / goal!).clamp(0.0, 1.0) : 0.0;
     final displayDueDate = _displayDueDate();
     final hasDueDate = _hasDueDate;
-    final imageHeight = MediaQuery.sizeOf(context).width < 380 ? 130.0 : 150.0;
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.4);
 
-    return Stack(
-      children: [
-        Container(
+    return LayoutBuilder(
+      builder: (context, outerConstraints) {
+        final cardHeight = outerConstraints.maxHeight;
+        final cardWidth = outerConstraints.maxWidth;
+        final isCompact = cardHeight < 460 || cardWidth < 360;
+        final isVeryCompact = cardHeight < 420 || cardWidth < 340;
+
+        final padding = isVeryCompact ? 12.0 : 16.0;
+        final gapSm = isVeryCompact ? 4.0 : 6.0;
+        final gapMd = isVeryCompact ? 8.0 : 10.0;
+        final gapLg = isVeryCompact ? 10.0 : 12.0;
+        final titleLines = isVeryCompact ? 1 : 2;
+        final descriptionLines = isVeryCompact ? 1 : (isCompact ? 1 : 2);
+        final preferredImageHeight = isVeryCompact
+            ? 96.0
+            : isCompact
+                ? 118.0
+                : cardWidth < 400
+                    ? 130.0
+                    : cardWidth < 600
+                        ? 150.0
+                        : 170.0;
+        final buttonHeight =
+            ((isVeryCompact ? 36 : 40) * textScale).round().clamp(36, 52);
+        final metaFontSize = isVeryCompact ? 11.0 : 14.0;
+
+        Widget raisedStats() {
+          if (isGeneralCampaign) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (hasGoal) ...[
+                  LinearProgressIndicator(
+                    color: const Color(0xFFFFD400),
+                    minHeight: isVeryCompact ? 6 : 8,
+                    borderRadius: BorderRadius.circular(10),
+                    value: percent,
+                    backgroundColor: Colors.white.withOpacity(0.3),
+                  ),
+                  SizedBox(height: gapSm),
+                ],
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: [
+                    Text(
+                      hasGoal
+                          ? "₹${raised > goal! ? goal : raised}"
+                          : "₹$raised",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: kSmallTitleM.copyWith(
+                        color: const Color(0xFFFFD400),
+                        fontSize: metaFontSize,
+                      ),
+                    ),
+                    if (hasGoal) ...[
+                      Text(
+                        "raisedOf".tr(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kSmallTitleR.copyWith(
+                          color: kWhite,
+                          fontSize: metaFontSize,
+                        ),
+                      ),
+                      Text(
+                        "₹$goal",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kSmallTitleSB.copyWith(
+                          color: kWhite,
+                          fontSize: metaFontSize,
+                        ),
+                      ),
+                      Text(
+                        "goal".tr(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kSmallTitleR.copyWith(
+                          color: kWhite,
+                          fontSize: metaFontSize,
+                        ),
+                      ),
+                      Text(
+                        "${(percent * 100).toInt()}%",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kSmallTitleSB.copyWith(
+                          color: kWhite,
+                          fontSize: metaFontSize,
+                        ),
+                      ),
+                    ] else
+                      Text(
+                        "raised".tr(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kSmallTitleR.copyWith(
+                          color: kWhite,
+                          fontSize: metaFontSize,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          }
+
+          return Wrap(
+            spacing: 4,
+            runSpacing: 2,
+            children: [
+              Text(
+                "₹$raised",
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: kSmallTitleM.copyWith(
+                  color: const Color(0xFFFFD400),
+                  fontSize: metaFontSize,
+                ),
+              ),
+              Text(
+                "raised".tr(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: kSmallTitleR.copyWith(
+                  color: kWhite,
+                  fontSize: metaFontSize,
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [const Color(0xFF0A39C4), const Color(0xFF181818)],
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0A39C4), Color(0xFF181818)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
             borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.all(16),
+          clipBehavior: Clip.antiAlias,
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  if (isGeneralCampaign)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 6),
-                      child: _WarningBadge(),
-                    ),
-                  if (hasDueDate)
-                    Text(
-                      "dueDate".tr(),
-                      style: kSmallerTitleSB.copyWith(
-                        fontSize: 10,
-                        color: kWhite,
-                      ),
-                    ),
-                  const Spacer(),
-                  if (hasDueDate)
-                    Flexible(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.calendar_today,
-                                color: kWhite, size: 14),
-                            const SizedBox(width: 6),
+              Expanded(
+                child: ClipRect(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          if (isGeneralCampaign)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 6),
+                              child: _WarningBadge(),
+                            ),
+                          if (hasDueDate)
+                            Text(
+                              "dueDate".tr(),
+                              style: kSmallerTitleSB.copyWith(
+                                fontSize: isVeryCompact ? 9 : 10,
+                                color: kWhite,
+                              ),
+                            ),
+                          const Spacer(),
+                          if (hasDueDate)
                             Flexible(
-                              child: Text(
-                                displayDueDate,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: kSmallerTitleM.copyWith(
-                                  fontSize: 10,
-                                  color: kWhite,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isVeryCompact ? 8 : 12,
+                                  vertical: isVeryCompact ? 4 : 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      color: kWhite,
+                                      size: isVeryCompact ? 12 : 14,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        displayDueDate,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: kSmallerTitleM.copyWith(
+                                          fontSize: isVeryCompact ? 9 : 10,
+                                          color: kWhite,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ],
+                          if (id.isNotEmpty)
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              icon: Icon(
+                                Icons.share_outlined,
+                                color: kWhite,
+                                size: isVeryCompact ? 18 : 20,
+                              ),
+                              onPressed: () => _shareCampaign(ref),
+                            ),
+                        ],
+                      ),
+                      SizedBox(height: gapLg),
+                      // Image shrinks first; Donate Now stays reserved below.
+                      Flexible(
+                        fit: FlexFit.loose,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final maxHeight = constraints.maxHeight;
+                            if (!maxHeight.isFinite || maxHeight <= 0) {
+                              return const SizedBox.shrink();
+                            }
+                            final imageHeight =
+                                preferredImageHeight > maxHeight
+                                    ? maxHeight
+                                    : preferredImageHeight;
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                image ?? '',
+                                height: imageHeight,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  height: imageHeight,
+                                  color: Colors.grey[300],
+                                  child: Icon(Icons.broken_image,
+                                      color: Colors.grey[600]),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
-                    ),
-                  if (id.isNotEmpty)
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
+                      SizedBox(height: gapMd),
+                      Text(
+                        title,
+                        style: kBodyTitleSB.copyWith(
+                          color: kWhite,
+                          fontSize: isVeryCompact ? 14 : null,
+                        ),
+                        maxLines: titleLines,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      icon: const Icon(
-                        Icons.share_outlined,
-                        color: kWhite,
-                        size: 20,
+                      SizedBox(height: gapSm),
+                      Text(
+                        description,
+                        style: kSmallerTitleR.copyWith(
+                          color: kWhite.withOpacity(0.8),
+                          fontSize: isVeryCompact ? 11 : null,
+                        ),
+                        maxLines: descriptionLines,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      onPressed: () => _shareCampaign(ref),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  image ?? '',
-                  height: imageHeight,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 120,
-                    color: Colors.grey[300],
-                    child: Icon(Icons.broken_image, color: Colors.grey[600]),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: kBodyTitleSB.copyWith(color: kWhite),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                description,
-                style: kSmallerTitleR.copyWith(
-                  color: kWhite.withOpacity(0.8),
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 12),
-              if (isGeneralCampaign)
-                Column(
-                  children: [
-                    if (hasGoal) ...[
-                      LinearProgressIndicator(
-                        color: const Color(0xFFFFD400),
-                        minHeight: 8,
-                        borderRadius: BorderRadius.circular(10),
-                        value: percent,
-                        backgroundColor: Colors.white.withOpacity(0.3),
-                      ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: gapMd),
+                      raisedStats(),
                     ],
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        Text(
-                          hasGoal
-                              ? "₹${raised > goal! ? goal : raised}"
-                              : "₹$raised",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: kSmallTitleM.copyWith(
-                              color: const Color(0xFFFFD400)),
-                        ),
-                        if (hasGoal) ...[
-                          Text(
-                            "raisedOf".tr(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: kSmallTitleR.copyWith(color: kWhite),
-                          ),
-                          Text(
-                            "₹$goal",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: kSmallTitleSB.copyWith(color: kWhite),
-                          ),
-                          Text(
-                            "goal".tr(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: kSmallTitleR.copyWith(color: kWhite),
-                          ),
-                          Text(
-                            "${(percent * 100).toInt()}%",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: kSmallTitleSB.copyWith(color: kWhite),
-                          ),
-                        ] else
-                          Text(
-                            "raised".tr(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: kSmallTitleR.copyWith(color: kWhite),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                )
-              else
-                Column(
-                  children: [
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        Text(
-                          "₹$raised",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: kSmallTitleM.copyWith(
-                              color: const Color(0xFFFFD400)),
-                        ),
-                        Text(
-                          "raised".tr(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: kSmallTitleR.copyWith(color: kWhite),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              Row(
-                children: [
-                  Expanded(
-                    child: primaryButton(
-                      label: "donateNow".tr(),
-                      onPressed: onViewDetails,
-                      buttonColor: kWhite.withOpacity(0.2),
-                      labelColor: kWhite,
-                      sideColor: kWhite,
-                      fontSize: 14,
-                      buttonHeight: (40 * textScale).ceil(),
-                    ),
                   ),
-                ],
+                ),
+              ),
+              SizedBox(height: gapLg),
+              // Always reserved — never clipped by image/title overflow.
+              primaryButton(
+                label: "donateNow".tr(),
+                onPressed: onViewDetails,
+                buttonColor: kWhite.withOpacity(0.2),
+                labelColor: kWhite,
+                sideColor: kWhite,
+                fontSize: isVeryCompact ? 13 : 14,
+                buttonHeight: buttonHeight,
               ),
             ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
