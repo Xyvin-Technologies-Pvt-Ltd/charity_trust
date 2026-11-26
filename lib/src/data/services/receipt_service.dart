@@ -2,11 +2,11 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:file_saver/file_saver.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 /// Receipt service for downloading and sharing PDF receipts
-/// Uses file_saver for cross-platform Downloads folder access
-
+/// Uses file_saver for cross-platform Downloads folder access with path_provider fallback
 class ReceiptService {
   final Dio _dio;
 
@@ -17,7 +17,7 @@ class ReceiptService {
   Future<String> downloadReceipt(String receiptUrl) async {
     try {
       final fileName = _extractFileName(receiptUrl);
-      
+
       // Download file to bytes
       final response = await _dio.get<List<int>>(
         receiptUrl,
@@ -30,17 +30,33 @@ class ReceiptService {
         },
       );
 
-      if (response.data == null) {
+      if (response.data == null || response.data!.isEmpty) {
         throw Exception('Failed to download receipt data');
       }
 
-      // Save using file_saver
-      final path = await FileSaver.instance.saveFile(
-        name: fileName,
-        bytes: Uint8List.fromList(response.data!),
-        fileExtension: 'pdf',
-        mimeType: MimeType.pdf,
-      );
+      final bytes = Uint8List.fromList(response.data!);
+      String path = '';
+
+      try {
+        path = await FileSaver.instance.saveFile(
+          name: fileName,
+          bytes: bytes,
+          fileExtension: 'pdf',
+          mimeType: MimeType.pdf,
+        );
+      } catch (saveError) {
+        print('FileSaver failed: $saveError. Falling back to documents directory.');
+      }
+
+      // Check if file_saver succeeded and file actually exists
+      if (path.isEmpty ||
+          path.contains('Something went wrong') ||
+          !await File(path).exists()) {
+        final docsDir = await getApplicationDocumentsDirectory();
+        final fallbackFile = File('${docsDir.path}/$fileName.pdf');
+        await fallbackFile.writeAsBytes(bytes);
+        path = fallbackFile.path;
+      }
 
       return path;
     } catch (e) {
@@ -66,31 +82,40 @@ class ReceiptService {
 
       // Create temporary file for sharing
       final tempDir = Directory.systemTemp;
-      final tempFile = File('${tempDir.path}/$fileName');
+      final tempFile = File('${tempDir.path}/$fileName.pdf');
       await tempFile.writeAsBytes(response.data!);
 
       final file = XFile(tempFile.path);
 
-      await Share.shareXFiles(
-        [file],
-        subject: 'Donation Receipt',
-        text: 'Please find my donation receipt attached.',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [file],
+          subject: 'Donation Receipt',
+          text: 'Please find my donation receipt attached.',
+        ),
       );
     } catch (e) {
       throw Exception('Failed to share receipt: $e');
     }
   }
 
-  /// Extract filename from URL
+  /// Extract base filename from URL without extension
   String _extractFileName(String url) {
     try {
       final uri = Uri.parse(url);
-      final pathSegments = uri.path.split('/');
-      return pathSegments.last.isNotEmpty
-          ? pathSegments.last
-          : 'receipt_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final rawName = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : '';
+      final decoded = rawName.isNotEmpty ? Uri.decodeComponent(rawName) : '';
+      if (decoded.isNotEmpty) {
+        final clean = decoded
+            .replaceAll(RegExp(r'\.pdf$', caseSensitive: false), '')
+            .replaceAll(RegExp(r'[^\w\-_.]'), '_');
+        return clean.isNotEmpty
+            ? clean
+            : 'receipt_${DateTime.now().millisecondsSinceEpoch}';
+      }
+      return 'receipt_${DateTime.now().millisecondsSinceEpoch}';
     } catch (e) {
-      return 'receipt_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      return 'receipt_${DateTime.now().millisecondsSinceEpoch}';
     }
   }
 

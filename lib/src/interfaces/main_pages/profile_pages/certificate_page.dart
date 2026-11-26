@@ -10,7 +10,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:file_saver/file_saver.dart';
-import 'package:open_file/open_file.dart';
+import 'package:open_filex/open_filex.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:cross_file/cross_file.dart';
@@ -98,7 +98,7 @@ class _CertificatePageState extends State<CertificatePage> {
                   onPressed: () async {
                     ScaffoldMessenger.of(context).hideCurrentSnackBar();
                     try {
-                      final result = await OpenFile.open(filePath);
+                      final result = await OpenFilex.open(filePath);
                       if (result.type != ResultType.done) {
                         if (mounted) {
                           SnackbarService().showSnackBar(

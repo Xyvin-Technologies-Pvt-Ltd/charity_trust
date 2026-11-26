@@ -467,7 +467,7 @@ class _ShareButton extends ConsumerWidget {
 //
 // DOWNLOAD BUTTON
 //
-class _DownloadButton extends ConsumerWidget {
+class _DownloadButton extends ConsumerStatefulWidget {
   final String? receiptUrl;
 
   const _DownloadButton({
@@ -476,20 +476,34 @@ class _DownloadButton extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DownloadButton> createState() => _DownloadButtonState();
+}
+
+class _DownloadButtonState extends ConsumerState<_DownloadButton> {
+  bool _isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
     return ElevatedButton(
-      onPressed: receiptUrl == null
+      onPressed: (widget.receiptUrl == null || _isLoading)
           ? null
           : () async {
+              setState(() => _isLoading = true);
               try {
                 final filePath =
-                    await ref.read(downloadReceiptProvider(receiptUrl!).future);
+                    await ref.read(downloadReceiptProvider(widget.receiptUrl!).future);
                 await ref.read(openPdfProvider(filePath).future);
               } catch (e) {
-                SnackbarService().showSnackBar(
-                  'failedToOpenReceipt'.tr(args: [e.toString()]),
-                  type: SnackbarType.error,
-                );
+                if (mounted) {
+                  SnackbarService().showSnackBar(
+                    'failedToOpenReceipt'.tr(args: [e.toString()]),
+                    type: SnackbarType.error,
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() => _isLoading = false);
+                }
               }
             },
       style: ElevatedButton.styleFrom(
@@ -501,7 +515,16 @@ class _DownloadButton extends ConsumerWidget {
           borderRadius: BorderRadius.circular(8),
         ),
       ),
-      child: const Text("Download"),
+      child: _isLoading
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: kWhite,
+              ),
+            )
+          : const Text("Download"),
     );
   }
 }

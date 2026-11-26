@@ -8,7 +8,7 @@ import 'package:Annujoom/src/data/providers/receipt_provider.dart';
 import 'package:Annujoom/src/data/providers/file_opener_provider.dart';
 import 'package:Annujoom/src/data/services/snackbar_service.dart';
 
-class TransactionCard extends ConsumerWidget {
+class TransactionCard extends ConsumerStatefulWidget {
   final String id;
   final String type;
   final String date;
@@ -28,22 +28,42 @@ class TransactionCard extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TransactionCard> createState() => _TransactionCardState();
+}
+
+class _TransactionCardState extends ConsumerState<TransactionCard> {
+  bool _isDownloading = false;
+
+  Future<void> _handleDownloadReceipt() async {
+    if (_isDownloading || widget.receipt.isEmpty) return;
+    setState(() {
+      _isDownloading = true;
+    });
+
+    try {
+      final filePath =
+          await ref.read(downloadReceiptProvider(widget.receipt).future);
+      await ref.read(openPdfProvider(filePath).future);
+    } catch (e) {
+      if (mounted) {
+        SnackbarService().showSnackBar(
+          'failedToOpenReceipt'.tr(args: [e.toString()]),
+          type: SnackbarType.error,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: receipt.isEmpty
-          ? null
-          : () async {
-              try {
-                final filePath =
-                    await ref.read(downloadReceiptProvider(receipt).future);
-                await ref.read(openPdfProvider(filePath).future);
-              } catch (e) {
-                SnackbarService().showSnackBar(
-                  'failedToOpenReceipt'.tr(args: [e.toString()]),
-                  type: SnackbarType.error,
-                );
-              }
-            },
+      onTap: widget.receipt.isEmpty ? null : _handleDownloadReceipt,
       child: Container(
         decoration: BoxDecoration(
           color: kCardBackgroundColor,
@@ -58,44 +78,45 @@ class TransactionCard extends ConsumerWidget {
               children: [
                 TextPill(
                   color: Color(0xFFDBDBDB),
-                  text: "transactionId".tr(args: [id]),
+                  text: "transactionId".tr(args: [widget.id]),
                   textStyle: kSmallerTitleR.copyWith(
                     fontSize: 10,
                   ),
                 ),
-                if (receipt.isNotEmpty)
-                  IconButton(
-                    onPressed: () async {
-                      try {
-                        final filePath = await ref
-                            .read(downloadReceiptProvider(receipt).future);
-                        await ref.read(openPdfProvider(filePath).future);
-                      } catch (e) {
-                        SnackbarService().showSnackBar(
-                          'failedToOpenReceipt'.tr(args: [e.toString()]),
-                          type: SnackbarType.error,
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.download),
-                    color: kPrimaryColor,
-                    tooltip: 'downloadReceipt'.tr(),
-                    visualDensity: VisualDensity.compact,
-                  ),
+                if (widget.receipt.isNotEmpty)
+                  _isDownloading
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: kPrimaryColor,
+                            ),
+                          ),
+                        )
+                      : IconButton(
+                          onPressed: _handleDownloadReceipt,
+                          icon: const Icon(Icons.download),
+                          color: kPrimaryColor,
+                          tooltip: 'downloadReceipt'.tr(),
+                          visualDensity: VisualDensity.compact,
+                        ),
               ],
             ),
             const SizedBox(height: 12),
-            if (donorName.isNotEmpty) ...[
-              _row("name".tr(), donorName),
+            if (widget.donorName.isNotEmpty) ...[
+              _row("name".tr(), widget.donorName),
               const Divider(),
             ],
-            _row("type".tr(), type),
+            _row("type".tr(), widget.type),
             const Divider(),
-            _row("dateTime".tr(), date),
+            _row("dateTime".tr(), widget.date),
             const Divider(),
-            _row("amountPaid".tr(), amount),
+            _row("amountPaid".tr(), widget.amount),
             const Divider(),
-            _row("statusLabel".tr(), status, isStatus: true),
+            _row("statusLabel".tr(), widget.status, isStatus: true),
           ],
         ),
       ),

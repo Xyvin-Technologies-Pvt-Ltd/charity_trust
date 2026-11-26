@@ -1,5 +1,6 @@
 import 'dart:io';
-import 'package:open_file/open_file.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// Service for opening files with default applications
 class FileOpenerService {
@@ -11,9 +12,23 @@ class FileOpenerService {
         throw Exception('File not found: $filePath');
       }
 
-      final result = await OpenFile.open(filePath);
+      final result = await OpenFilex.open(filePath);
+      if (result.type != ResultType.done) {
+        // Fallback: If direct open fails, present native share sheet
+        await SharePlus.instance.share(
+          ShareParams(files: [XFile(filePath)], subject: 'Receipt'),
+        );
+      }
       return result;
     } catch (e) {
+      try {
+        if (await File(filePath).exists()) {
+          await SharePlus.instance.share(
+            ShareParams(files: [XFile(filePath)], subject: 'Receipt'),
+          );
+          return OpenResult(type: ResultType.done, message: 'Opened via share');
+        }
+      } catch (_) {}
       throw Exception('Failed to open file: $e');
     }
   }
