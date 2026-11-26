@@ -12,6 +12,30 @@ enum CustomFieldType {
   email
 }
 
+/// Formats typed digits as `dd-MM-yyyy`, inserting hyphens automatically.
+class _DateInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final limited = digits.length > 8 ? digits.substring(0, 8) : digits;
+
+    final buffer = StringBuffer();
+    for (var i = 0; i < limited.length; i++) {
+      if (i == 2 || i == 4) buffer.write('-');
+      buffer.write(limited[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 class InputField extends StatelessWidget {
   final CustomFieldType type;
   final String hint;
@@ -94,19 +118,23 @@ class InputField extends StatelessWidget {
       controller: controller,
       focusNode: focusNode,
       maxLines: isText ? maxLines : 1,
-      readOnly: readOnly || isDate || type == CustomFieldType.document,
+      readOnly: readOnly || type == CustomFieldType.document,
       keyboardType: isNumber
           ? TextInputType.numberWithOptions(decimal: allowDecimal)
-          : isEmail
-              ? TextInputType.emailAddress
-              : TextInputType.text,
+          : isDate
+              ? TextInputType.number
+              : isEmail
+                  ? TextInputType.emailAddress
+                  : TextInputType.text,
       inputFormatters: isNumber
           ? [
               FilteringTextInputFormatter.allow(
                 allowDecimal ? RegExp(r'^\d*\.?\d*$') : RegExp(r'\d+'),
               ),
             ]
-          : null,
+          : isDate
+              ? [_DateInputFormatter()]
+              : null,
       validator: validator ??
           (isEmail
               ? (value) {
@@ -122,13 +150,7 @@ class InputField extends StatelessWidget {
       autovalidateMode: AutovalidateMode.onUserInteraction,
       style: kBodyTitleR,
       cursorColor: kPrimaryColor,
-      onTap: () async {
-        if (isDate) {
-          await _showDatePicker(context);
-        } else if (type == CustomFieldType.document) {
-          onUpload?.call();
-        }
-      },
+      onTap: type == CustomFieldType.document ? onUpload : null,
       decoration: InputDecoration(
         fillColor: kWhite,
         hintText: hint,
